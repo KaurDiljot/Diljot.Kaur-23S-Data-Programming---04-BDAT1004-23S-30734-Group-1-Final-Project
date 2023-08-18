@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Weather App</title>
+    <!-- Load Google Charts library here -->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+</head>
+<body>
+    <h1>Weather in {{ weather_data['location'] }}</h1>
+    <p>Temperature: {{ weather_data['temperature'] }}°C</p>
+    <p>Feels Like: {{ weather_data['temperature_feels_like'] }}°C</p>
+    <p>Humidity: {{ weather_data['humidity'] }}%</p>
+    <p>Wind Speed: {{ weather_data['wind_speed'] }} m/s</p>
+    <p>Description: {{ weather_data['weather_description'] }}</p>
+    <p>Recorded At: {{ weather_data['recorded_at'] }}</p>
+   
+    <!-- Table to display all recorded data -->
+    <table>
+        <tr>
+            <th>Recorded At</th>
+            <th>Temperature (°C)</th>
+            <th>Feels Like (°C)</th>
+            <th>Humidity (%)</th>
+            <th>Wind Speed (m/s)</th>
+            <th>Description</th>
+        </tr>
+        {% for entry in all_weather_data %}
+            <tr>
+                <td>{{ entry['recorded_at'] }}</td>
+                <td>{{ entry['temperature'] }}</td>
+                <td>{{ entry['temperature_feels_like'] }}</td>
+                <td>{{ entry['humidity'] }}</td>
+                <td>{{ entry['wind_speed'] }}</td>
+                <td>{{ entry['weather_description'] }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+    <!-- Chart div -->
+    <div id="chart_div" style="width: 800px; height: 400px;"></div>
+    <!-- Dual Line Chart div -->
+    <div id="dual_chart_div" style="width: 800px; height: 400px;"></div>
+    <!-- Temperature Comparison Chart div -->
+    <div id="temp_compare_chart_div" style="width: 800px; height: 400px;"></div>
+
+    <!-- JavaScript code for Google Charts here -->
+    <script>
+        google.charts.load('current', {'packages':['corechart']});
+        google.charts.setOnLoadCallback(drawCharts);
+
+        function drawCharts() {
+            fetch('/api/get_all_weather_data')
+                .then(response => response.json())
+                .then(data => {
+                    drawTemperatureChart(data);
+                    drawDualChart(data);
+                    drawTempCompareChart(data);
+                });
+        }
+
+        function drawTemperatureChart(data) {
+            var chartData = [['Recorded At', 'Temperature']];
+            data.forEach(item => {
+                chartData.push([item.recorded_at, parseFloat(item.temperature)]);
+            });
+            var options = {
+                title: 'Temperature Over Time',
+                curveType: 'function',
+                legend: { position: 'bottom' }
+            };
+            var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+            chart.draw(google.visualization.arrayToDataTable(chartData), options);
+        }
+
+        function drawDualChart(data) {
+            var dualChartData = [['Recorded At', 'Wind Speed (m/s)', 'Humidity (%)']];
+            data.forEach(item => {
+                dualChartData.push([item.recorded_at, parseFloat(item.wind_speed), parseFloat(item.humidity)]);
+            });
+            var dualOptions = {
+                title: 'Wind Speed and Humidity Variations',
+                curveType: 'function',
+                legend: { position: 'bottom' }
+            };
+            var dualChart = new google.visualization.LineChart(document.getElementById('dual_chart_div'));
+            dualChart.draw(google.visualization.arrayToDataTable(dualChartData), dualOptions);
+        }
+
+        function drawTempCompareChart(data) {
+            var currentTime = new Date();
+            var twentyFourHoursAgo = new Date();
+            twentyFourHoursAgo.setHours(currentTime.getHours() - 24);
+
+            var totalTemperature = 0;
+            var count = 0;
+
+            data.forEach(item => {
+                var recordedTime = new Date(item.recorded_at);
+                if (recordedTime >= twentyFourHoursAgo && recordedTime <= currentTime) {
+                    totalTemperature += parseFloat(item.temperature);
+                    count++;
+                }
+            });
+
+            var averageTemperature = totalTemperature / count;
+
+            var tempCompareChartData = google.visualization.arrayToDataTable([
+                ['Temperature', 'Value'],
+                ['Current Temperature', parseFloat('{{ weather_data['temperature'] }}')],
+                ['Average Temperature (24 hrs)', averageTemperature]
+            ]);
+
+            var tempCompareOptions = {
+                title: 'Current Temperature vs. Average Temperature (24 hrs)',
+                legend: { position: 'none' }
+            };
+
+            var tempCompareChart = new google.visualization.BarChart(document.getElementById('temp_compare_chart_div'));
+            tempCompareChart.draw(tempCompareChartData, tempCompareOptions);
+        }
+    </script>
+</body>
+</html>
